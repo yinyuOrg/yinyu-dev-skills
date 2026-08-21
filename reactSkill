@@ -1,0 +1,85 @@
+---
+name: frontend-react
+description: |
+  React development assistance for React 18+ projects (Vite/Next.js/CRA). Use
+  when the user asks to "write a React component", "build a custom hook",
+  "type props with TypeScript", "fix a useEffect bug", "optimize re-renders",
+  "set up React Query / Zustand", "configure Tailwind", or needs guidance on
+  hooks rules, component composition, state management, or React performance.
+  Triggers on phrases like "用 React 写", "组件封装", "Hook 怎么写",
+  "React 性能优化". Do NOT use for Vue/Svelte/Solid, React Native, backend
+  Node.js, or one-line bug fixes.
+---
+
+# Frontend React
+
+## 原则
+- 跟项目现有风格走 > 套"最佳实践"
+- 能用 props 不上 Context
+- TS 严守，`any` 禁止
+- 先量化再优化（React DevTools Profiler）
+
+## Procedure
+
+1. **先读项目** — `package.json`（看 React 版本、UI 库、状态库）+ 2-3 个邻近组件
+   关键看：`react` 版本（18/19）、`react-dom` 同步、UI 库（AntD v4/v5 差很多）、状态库、样式方案
+2. **写之前列假设** — React 版本、是否 SSR/Next.js、TS 严格度、UI 库版本、是否需要 RSC
+3. **组件** — 函数组件 + `interface Props`；>200 行拆；key 用稳定 ID 不用 index
+4. **状态分层**
+   - 本地：`useState` / `useReducer`（状态机用 reducer）
+   - 跨树低频：`useContext`（主题、locale、用户）
+   - 跨树高频 / 复杂：`Zustand` / `Jotai`
+   - 服务端数据：**`React Query / SWR`**（不要用 Redux 存服务端数据）
+   - 跨页面：URL search params（`useSearchParams`）
+5. **Hooks 规则**
+   - 顶层调用，不在条件/循环里
+   - 依赖数组必须完整（开 `exhaustive-deps` lint 强制）
+   - 订阅/计时器/IO 必须 cleanup
+   - 能在事件 handler 写的别塞 `useEffect`
+   - 闭包陷阱用函数式更新（`setState(c => c + 1)`）避免
+6. **TS 规则**
+   - `interface Props` 不用 `type`（接口可扩展）
+   - 事件 handler 不暴露 `e` 给父组件
+   - Ref 类型 `useRef<HTMLInputElement>(null)`，使用 `ref.current?.focus()`
+   - 泛型组件 `<T extends {}>` 不用 `<T = any>`
+7. **性能**（按代价顺序）
+   - 列表 >100 行加虚拟化（`@tanstack/react-virtual`）
+   - 父组件用 `key` 控制子组件重置（最便宜的"重置 state"）
+   - 派生值不存 state（`const total = items.length`，别用 useState 同步）
+   - 大组件 `memo()` 配合稳定 props（`useMemo` 包对象、`useCallback` 包函数）
+   - 拆分 state（一列一字段，别一锅端）
+   - 慢计算用 `useMemo` / Web Worker
+   - 路由级 `lazy()` + `Suspense`
+8. **Next.js 专项**（如果项目是 Next.js）
+   - 默认所有组件是 **Server Component**，要 hooks / 事件 / 浏览器 API 才 `'use client'`
+   - 数据获取优先 `fetch` + `cache` / Server Action，不要 useEffect + fetch
+   - 图片用 `next/image`、字体用 `next/font`、链接用 `next/link`
+9. **交付前** — `npm run lint -- --fix`；新文件给完整代码（不省略 import）
+
+## Output contract
+- 代码块标 ` ```tsx `
+- 关键决策用一句注释说明**为什么**
+- 改完跑一遍 lint + type check
+
+## Failure handling
+- 项目结构不清楚 → 先 `ls` 不假设
+- 现有风格和"最佳实践"冲突 → 跟现有走
+- TS 报错 → 看 .d.ts 推导链，不一上来 `as any`
+- 性能问题复现不了 → React DevTools Profiler 先量化
+- 状态库选型纠结 → 列 2-3 个对比让用户选
+- "这组件该不该用 Client Component" → 看是否用了 hooks/事件/浏览器 API
+
+## Examples
+
+**Input**: "用 React + TS 写个搜索+分页+点击进详情的用户列表"
+
+**Output**:
+- `types/user.ts` — `User`、`UserListQuery`、`UsersResponse`
+- `api/users.ts` — fetch 封装
+- `useUsers.ts` — React Query 封装，缓存 + loading + error + 分页
+- `UserList.tsx` — 搜索 debounce 300ms、分页、行点击
+- 关键注释：为什么用 React Query 而不是 useState、为什么搜索 debounce
+
+**Input**: "这段 useEffect 依赖不对"
+```tsx
+useEffect(() => { fetchData(query) }, [])
